@@ -1,12 +1,14 @@
-const errorHandler = (err, request, response, next) => {
-  console.error(err.stack); // Optional: send to external logging service
+const errorHandler = (err, req, res, next) => {
+  const errStack = err.stack;
+  console.error(errStack);
 
-  const statusCode = response.statusCode !== 200 ? response.statusCode : 500;
+  const responseJSON = {
+    stack: process.env.NODE_ENV === 'production' ? '💥' : errStack,
+  };
 
-  response.status(statusCode).json({
-    message: err.message || 'Internal Server Error',
-    stack: process.env.NODE_ENV === 'production' ? '💥' : err.stack,
-  });
+  res
+    .status(err.status || 500)
+    .json({ message: 'errorHandler.js: Internal Server Error.', ...responseJSON });
 };
 
 export default errorHandler;
