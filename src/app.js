@@ -13,7 +13,7 @@ app.get('/', (req, res) => {
 });
 
 app.post('/boom', (req, res) => {
-  const err = new Error('Async Boom!');
+  const err = new Error('Boom!');
   err.status = 500;
 
   throw err;
