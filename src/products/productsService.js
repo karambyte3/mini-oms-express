@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { getProductObjIndex } from '../helpers/productsHelper.js';
+import { NotFoundError, ConflictError } from '../errors/HttpError.js';
+
+// Only these fields may come from the client; id/createdAt/updatedAt are ours.
+const WRITABLE_FIELDS = ['name', 'sku', 'priceCents', 'stock'];
+
+const pickWritable = (body = {}) =>
+  Object.fromEntries(Object.entries(body).filter(([key]) => WRITABLE_FIELDS.includes(key)));
 
 const products = [
   {
@@ -47,50 +54,60 @@ export const findAll = () => {
   return products.length > 0 ? products : [];
 };
 
-export const findById = (id, create) => {
+export const findById = (id) => {
   const foundProduct = products.find((product) => product.id === id);
 
-  if (create) {
-    return null;
+  if (!foundProduct) {
+    throw new NotFoundError(`Product ${id} not found`);
   }
 
-  return foundProduct || { error: true, message: 'Product ID was NOT FOUND!' };
+  return foundProduct;
 };
 
-export const createProduct = (reqObject) => {
-  const createdDate = new Date();
-  const id = randomUUID();
+const findBySku = (sku) => products.find((product) => product.sku === sku);
 
-  const alreadyExist = findById(reqObject.id, true);
+// exceptId lets an update keep its own sku without tripping the check.
+const assertSkuIsFree = (sku, exceptId) => {
+  const owner = findBySku(sku);
 
-  if (alreadyExist) {
-    return { error: true, message: 'Product Already Exist' };
+  if (owner && owner.id !== exceptId) {
+    throw new ConflictError(`Product with sku ${sku} already exists`);
   }
+};
 
-  products.push({
-    id: id,
-    ...reqObject,
+export const createProduct = (body) => {
+  const data = pickWritable(body);
+  assertSkuIsFree(data.sku);
+
+  const createdDate = new Date();
+
+  // Our fields go last so nothing from the client can override them.
+  const newProduct = {
+    ...data,
+    id: randomUUID(),
     createdAt: createdDate,
     updatedAt: createdDate,
-  });
+  };
 
-  return products;
+  products.push(newProduct);
+
+  return newProduct;
 };
 
-export const updateProduct = (id, newProductReqObj) => {
+export const updateProduct = (id, body) => {
   const product = findById(id);
   const productIndex = getProductObjIndex(product, products);
-  const updatedDate = new Date();
+  const changes = pickWritable(body);
 
-  if (productIndex === -1) {
-    return { error: true, message: 'Product Not Found' };
+  if (changes.sku !== undefined) {
+    assertSkuIsFree(changes.sku, id);
   }
 
+  // PATCH = merge: keep existing fields, overwrite only the ones sent.
   const updatedProductObj = {
-    id: id,
-    ...newProductReqObj,
-    createdAt: product.createdAt,
-    updatedAt: updatedDate,
+    ...product,
+    ...changes,
+    updatedAt: new Date(),
   };
 
   products[productIndex] = updatedProductObj;
@@ -102,9 +119,7 @@ export const deleteProduct = (id) => {
   const product = findById(id);
   const productIndex = getProductObjIndex(product, products);
 
-  if (productIndex !== -1) {
-    products.splice(productIndex, 1);
-  }
+  products.splice(productIndex, 1);
 
   return products;
 };

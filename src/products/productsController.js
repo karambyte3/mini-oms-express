@@ -17,9 +17,9 @@ export const getProduct = (req, res) => {
 
 export const createProduct = (req, res) => {
   const newProductReqObj = req.body;
-  const updatedProductsArr = create(newProductReqObj);
+  const newProduct = create(newProductReqObj);
 
-  res.json(updatedProductsArr);
+  res.status(201).json(newProduct);
 };
 
 export const updateProduct = (req, res) => {
@@ -27,5 +27,5 @@ export const updateProduct = (req, res) => {
 };
 
 export const deleteProduct = (req, res) => {
-  res.json(deleteProd(req.params.id));
+  res.status(204).json(deleteProd(req.params.id));
 };
